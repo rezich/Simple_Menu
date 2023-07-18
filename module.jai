@@ -88,7 +88,6 @@ Linear_Menu_Item :: struct {
     on_select: (item: *Open_Linear_Menu.Item);
     data: Data;
     Data :: struct {
-        pointer_to_bool: *bool;
         pointer_to_value: *int;
         highest_value: int;
         value_to_string: (int) -> string;
@@ -104,16 +103,14 @@ make_linear_menu_item :: (text: string, on_select: (*Open_Linear_Menu.Item)) -> 
     return item;
 }
 make_linear_menu_item_from_code :: (text: string, on_select_code: Code) -> Linear_Menu_Item #expand {
-    on_select :: (item: *Open_Linear_Menu.Item) {
-        #insert on_select_code;
-    }
+    on_select :: (item: *Open_Linear_Menu.Item) { #insert on_select_code; }
     return make_linear_menu_item(text, on_select);
 }
 
 // checkbox
 make_linear_menu_item :: (text: string, pointer_to_bool: *bool) -> Linear_Menu_Item {
     toggle_bool :: (item: *Open_Linear_Menu.Item) {
-        item.data.pointer_to_bool.* = !item.data.pointer_to_bool.*;
+        (cast(*bool) item.data.pointer_to_value).* = !(cast(*bool) item.data.pointer_to_value).*;
         #if DEBUG_RENDERING then debug_render_current_menu();
     }
 
@@ -121,12 +118,13 @@ make_linear_menu_item :: (text: string, pointer_to_bool: *bool) -> Linear_Menu_I
     item.text = text;
     item.kind = .CHECKBOX;
     item.on_select = toggle_bool;
-    item.data.pointer_to_bool = pointer_to_bool;
+    item.data.pointer_to_value = cast(*int) pointer_to_bool;
+    log("CHECKBOX %: %", item.text, item.data.pointer_to_value);
     return item;
 }
 
 // integer
-make_linear_menu_item :: (text: string, pointer_to_value: *int, highest_value: int, value_to_string: (int) -> string = null) -> Linear_Menu_Item {
+/*make_linear_menu_item :: (text: string, pointer_to_value: *int, highest_value: int, value_to_string: (int) -> string = null) -> Linear_Menu_Item {
     toggle_int :: (item: *Open_Linear_Menu.Item) {
         new_value := item.data.pointer_to_value.* + 1;
         if new_value > item.data.highest_value then new_value = 0;
@@ -141,14 +139,14 @@ make_linear_menu_item :: (text: string, pointer_to_value: *int, highest_value: i
     item.data.highest_value = highest_value;
     item.data.value_to_string = value_to_string;
     return item;
-}
+}*/
 
 // enum
-make_linear_menu_item :: (text: string, pointer_to_enum: *$T, value_to_string: (int) -> string = null) -> Linear_Menu_Item #modify {
-    info := cast(*Type_Info) T;
-    return info.type == .ENUM;
+make_linear_menu_item :: (text: string, $$pointer_to_enum: *$T, value_to_string: (int) -> string = null) -> Linear_Menu_Item #modify {
+    return (cast(*Type_Info) T).type == .ENUM;
 } {
     toggle :: (item: *Open_Linear_Menu.Item) {
+        log("TOGGLING");
         value := (cast(*T) item.data.pointer_to_value).*;
         values := enum_values_as_enum(T);
         for values if it == value {
@@ -157,18 +155,20 @@ make_linear_menu_item :: (text: string, pointer_to_enum: *$T, value_to_string: (
             value = values[next_index];
             break;
         }
-        item.data.pointer_to_value.* = xx value;
+        item.data.pointer_to_value.* = cast(int) value;
         #if DEBUG_RENDERING then debug_render_current_menu();
     }
 
     default_value_to_string :: (value: int) -> string { return tprint("%", cast(T) value); }
 
+    log("\n--\n%", pointer_to_enum);
     item: Linear_Menu_Item;
     item.text = text;
     item.kind = .LIST;
     item.on_select = toggle;
     item.data.pointer_to_value = xx pointer_to_enum;
     item.data.value_to_string = ifx value_to_string else default_value_to_string;
+    log("LIST     %: %\n--\n\n", item.text, item.data.pointer_to_value);
     return item;
 }
 
@@ -197,7 +197,7 @@ debug_render_current_menu :: () {
     get_value :: (item: Open_Linear_Menu.Item) -> string {
         if item.kind == {
             case .DEFAULT; return "";
-            case .CHECKBOX; return tprint("[%]", ifx item.data.pointer_to_bool.* then "X" else " ");
+            case .CHECKBOX; return tprint("[%]", ifx (cast(*bool) item.data.pointer_to_value).* then "X" else " ");
             case .LIST;
                 if item.data.value_to_string then return item.data.value_to_string(item.data.pointer_to_value.*);
                 else return tprint("%", item.data.pointer_to_value.*);
@@ -209,11 +209,12 @@ debug_render_current_menu :: () {
     menu := *open_menus[current_menu_index];
     log("\n\n%\n----", menu.title);
 
-    for 0..menu.item_count-1 log("%1 %2%3%4",
+    for 0..menu.item_count-1 log("%5 %1 %2%3%4",
     /* 1 */ ifx it == menu.cursor then "->" else "  ",
     /* 2 */ menu.items[it].text,
     /* 3 */ ifx menu.items[it].kind != .DEFAULT then ": " else "",
-    /* 4 */ ifx menu.items[it].kind != .DEFAULT then get_value(menu.items[it])
+    /* 4 */ ifx menu.items[it].kind != .DEFAULT then get_value(menu.items[it]),
+    /* 5 */ menu.items[it].data.pointer_to_value
     );
     log("\n\n");
 }

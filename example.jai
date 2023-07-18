@@ -14,11 +14,17 @@ options: struct {
     }
 }
 
-Menu_Item  :: Open_Linear_Menu.Item;
-I/*tem  */ :: make_linear_menu_item;
-A/*ction*/ :: make_linear_menu_item_from_code;
+OPTIONS_POINTER :: *options;
+
+antialiasing: bool;
+quality:      enum { LOW; MEDIUM; HIGH; } = .MEDIUM;
+
 
 MENU :: struct {
+    Menu_Item  :: Open_Linear_Menu.Item;
+    I/*tem  */ :: make_linear_menu_item;
+    A/*ction*/ :: make_linear_menu_item_from_code;
+
     MAIN :: Linear_Menu("Main Menu",
         #run A("New Game" , #code { MENU.SELECT_DIFFICULTY.open(); }),
         #run A("Load Game", #code { MENU.SELECT_SAVE_SLOT.open();  }),
@@ -65,6 +71,7 @@ start_new_game :: (difficulty: int) { close_all_menus(); }
 load_game_from_slot ::  (slot: int) { close_all_menus(); }
 
 main :: () {
+    log("OPTIONS_POINTER: %", OPTIONS_POINTER);
     MENU.MAIN.open();
 
     menu_down();
@@ -79,12 +86,6 @@ main :: () {
     menu_select();
     menu_select();
     menu_select();
-    menu_select();
-    menu_select();
-    menu_cancel();
-    menu_cancel();
-    menu_cancel();
-    menu_up();
 
     report_memory_leaks();
 }
