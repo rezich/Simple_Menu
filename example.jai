@@ -1,16 +1,28 @@
-MAIN_MENU :: Linear_Menu("Main Menu",
-    Linear_Menu_Item.{"New Game"    , .DEFAULT},
-    Linear_Menu_Item.{"Load Game"   , .DEFAULT},
-    Linear_Menu_Item.{"Options"     , .DEFAULT},
-    Linear_Menu_Item.{"Quit"        , .DEFAULT}
-);
+I :: Linear_Menu_Item;
+
+MENU :: struct {
+    MAIN :: Linear_Menu("Main Menu",
+        I.{"New Game"    , .DEFAULT, null},
+        I.{"Load Game"   , .DEFAULT, null},
+        I.{"Options"     , .DEFAULT, (item: *Menu_Item) {
+            log("Hello");
+        }},
+        I.{"Quit"        , .DEFAULT, null}
+    );
+}
+
+
 
 
 
 main :: () {
-    MAIN_MENU.open();
+    MENU.MAIN.open();
 
+    log("MENU TITLE: %", menu_handler.open_menus[menu_handler.current_menu_index]);
 
+    menu_down();
+    menu_down();
+    menu_select();
 
     report_memory_leaks();
 }
