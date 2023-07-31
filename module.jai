@@ -1,14 +1,14 @@
 #module_parameters(MAX_MENUS := 8, MAX_ITEMS_PER_MENU := 4, DEBUG_RENDERING := false);
 
-Linear_Menu :: struct(
+Simple_Menu :: struct(
     title: string,
-    items: ..Linear_Menu_Item,
+    items: ..Simple_Menu_Item,
     on_cancel: () = close_menu
 ) #modify {
     assert(items.count <= MAX_ITEMS_PER_MENU, "Added too many menu items -- increase MAX_ITEMS_PER_MENU to a number higher than %!", MAX_ITEMS_PER_MENU);
     return true;
 } {
-    THIS_MENU :: #this;
+    THIS_MENU :: #this; // unused...
 
     open :: () {
         using menu_handler;
@@ -40,7 +40,7 @@ close_menu :: () {
 
 close_all_menus :: () { menu_handler.current_menu_index = -1; }
 
-menu_up :: () {
+menu_prev :: () {
     using menu_handler;
     if current_menu_index == -1 then return;
     menu := *open_menus[current_menu_index];
@@ -51,7 +51,7 @@ menu_up :: () {
     }
     #if DEBUG_RENDERING then debug_render_current_menu();
 }
-menu_down :: () {
+menu_next :: () {
     using menu_handler;
     if current_menu_index == -1 then return;
     menu := *open_menus[current_menu_index];
@@ -77,7 +77,7 @@ menu_cancel :: () {
     if proc then proc();
 }
 
-Linear_Menu_Item :: struct {
+Simple_Menu_Item :: struct {
     text: string;
     kind: Kind;
     Kind :: enum {
@@ -85,7 +85,7 @@ Linear_Menu_Item :: struct {
         CHECKBOX;
         LIST;
     }
-    on_select: (item: *Open_Linear_Menu.Item);
+    on_select: (item: *Open_Simple_Menu.Item);
     data: Data;
     Data :: struct {
         pointer_to_value: *int;
@@ -95,26 +95,32 @@ Linear_Menu_Item :: struct {
 }
 
 // generic menu item
-make_linear_menu_item :: (text: string, on_select: (*Open_Linear_Menu.Item)) -> Linear_Menu_Item {
-    item: Linear_Menu_Item;
+make_simple_menu_item :: (text: string, on_select: (*Open_Simple_Menu.Item)) -> Simple_Menu_Item {
+    item: Simple_Menu_Item;
     item.text = text;
     item.kind = .DEFAULT;
     item.on_select = on_select;
     return item;
 }
-make_linear_menu_item_from_code :: (text: string, on_select_code: Code) -> Linear_Menu_Item #expand {
-    on_select :: (item: *Open_Linear_Menu.Item) { #insert on_select_code; }
-    return make_linear_menu_item(text, on_select);
+
+// use this if on_select doesn't need the menu item
+make_simple_menu_item :: (text: string, on_select: ()) -> Simple_Menu_Item {
+    return make_simple_menu_item(text, cast((*Open_Simple_Menu.Item)) on_select);
+}
+
+// experimental...
+make_simple_menu_item_from_code :: (text: string, on_select_code: Code) -> Simple_Menu_Item #expand {
+    on_select :: (item: *Open_Simple_Menu.Item) { #insert on_select_code; }
+    return make_simple_menu_item(text, on_select);
 }
 
 // checkbox
-make_linear_menu_item :: (text: string, pointer_to_bool: *bool) -> Linear_Menu_Item {
-    toggle_bool :: (item: *Open_Linear_Menu.Item) {
+make_simple_menu_item :: (text: string, pointer_to_bool: *bool) -> Simple_Menu_Item {
+    toggle_bool :: (item: *Open_Simple_Menu.Item) {
         (cast(*bool) item.data.pointer_to_value).* = !(cast(*bool) item.data.pointer_to_value).*;
         #if DEBUG_RENDERING then debug_render_current_menu();
     }
-
-    item: Linear_Menu_Item;
+    item: Simple_Menu_Item;
     item.text = text;
     item.kind = .CHECKBOX;
     item.on_select = toggle_bool;
@@ -124,14 +130,14 @@ make_linear_menu_item :: (text: string, pointer_to_bool: *bool) -> Linear_Menu_I
 }
 
 // integer
-/*make_linear_menu_item :: (text: string, pointer_to_value: *int, highest_value: int, value_to_string: (int) -> string = null) -> Linear_Menu_Item {
-    toggle_int :: (item: *Open_Linear_Menu.Item) {
+/*make_simple_menu_item :: (text: string, pointer_to_value: *int, highest_value: int, value_to_string: (int) -> string = null) -> Simple_Menu_Item {
+    toggle_int :: (item: *Open_Simple_Menu.Item) {
         new_value := item.data.pointer_to_value.* + 1;
         if new_value > item.data.highest_value then new_value = 0;
         item.data.pointer_to_value.* = new_value;
         #if DEBUG_RENDERING then debug_render_current_menu();
     }
-    item: Linear_Menu_Item;
+    item: Simple_Menu_Item;
     item.text = text;
     item.kind = .LIST;
     item.on_select = toggle_int;
@@ -142,10 +148,10 @@ make_linear_menu_item :: (text: string, pointer_to_bool: *bool) -> Linear_Menu_I
 }*/
 
 // enum
-make_linear_menu_item :: (text: string, $$pointer_to_enum: *$T, value_to_string: (int) -> string = null) -> Linear_Menu_Item #modify {
-    return (cast(*Type_Info) T).type == .ENUM;
-} {
-    toggle :: (item: *Open_Linear_Menu.Item) {
+make_simple_menu_item :: (text: string, $$pointer_to_enum: *$T, value_to_string: (int) -> string = null) -> Simple_Menu_Item
+    #modify { return (cast(*Type_Info) T).type == .ENUM; }
+{
+    toggle :: (item: *Open_Simple_Menu.Item) {
         log("TOGGLING");
         value := (cast(*T) item.data.pointer_to_value).*;
         values := enum_values_as_enum(T);
@@ -162,7 +168,7 @@ make_linear_menu_item :: (text: string, $$pointer_to_enum: *$T, value_to_string:
     default_value_to_string :: (value: int) -> string { return tprint("%", cast(T) value); }
 
     log("\n--\n%", pointer_to_enum);
-    item: Linear_Menu_Item;
+    item: Simple_Menu_Item;
     item.text = text;
     item.kind = .LIST;
     item.on_select = toggle;
@@ -173,7 +179,7 @@ make_linear_menu_item :: (text: string, $$pointer_to_enum: *$T, value_to_string:
 }
 
 
-Open_Linear_Menu :: struct {
+Open_Simple_Menu :: struct {
     title: string;
     items: [MAX_ITEMS_PER_MENU] Item;
     item_count: int;
@@ -181,7 +187,7 @@ Open_Linear_Menu :: struct {
     cursor: int;
 
     Item :: struct {
-        using definition: *Linear_Menu_Item;
+        using definition: *Simple_Menu_Item;
         disabled: bool;
     }
 };
@@ -189,12 +195,12 @@ Open_Linear_Menu :: struct {
 #scope_module
 
 menu_handler: struct {
-    open_menus: [MAX_MENUS] Open_Linear_Menu;
+    open_menus: [MAX_MENUS] Open_Simple_Menu;
     current_menu_index := -1;
 }
 
 debug_render_current_menu :: () {
-    get_value :: (item: Open_Linear_Menu.Item) -> string {
+    get_value :: (item: Open_Simple_Menu.Item) -> string {
         if item.kind == {
             case .DEFAULT; return "";
             case .CHECKBOX; return tprint("[%]", ifx (cast(*bool) item.data.pointer_to_value).* then "X" else " ");
